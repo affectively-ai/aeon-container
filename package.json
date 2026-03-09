@@ -2,23 +2,15 @@
   "name": "@affectively/aeon-container",
   "version": "0.1.0",
   "type": "module",
-  "description": "Aeon Container — browser sandbox, persistent filesystem, and IDE components for code execution",
+  "description": "Aeon Container — browser sandbox, persistent filesystem, linting, and agent collaboration runtime",
   "exports": {
-    "./services/*": "./src/services/*.ts",
-    "./components/*": "./src/components/*.tsx",
-    "./components/aeon-container-ide.css": "./src/components/aeon-container-ide.css",
-    "./hooks/*": "./src/hooks/*.ts"
+    ".": "./src/index.ts",
+    "./services/*": "./src/services/*.ts"
   },
   "scripts": {
     "test": "bun ../../scripts/bun-isolated-runner.ts . --preload ../../bun.preload.ts"
   },
-  "peerDependencies": {
-    "react": "^19.0.0",
-    "@emotions-app/shared-ui": "workspace:*",
-    "yjs": "^13.6.29"
-  },
   "devDependencies": {
-    "@types/react": "19.2.14",
     "typescript": "^5.9.3"
   },
   "author": "Edgework DAO",

@@ -1,8 +1,10 @@
 /**
  * @affectively/aeon-container
  *
- * Browser sandbox, persistent filesystem, and IDE components for code execution.
- * Extracted from shared-ui to keep aeon-* code in the open-source namespace.
+ * Runtime services for browser-based code execution: sandbox, filesystem,
+ * linting, agent collaboration, and API routing.
+ *
+ * For IDE UI components and hooks, see @affectively/aeon-ide.
  */
 
 // ── Services ────────────────────────────────────────────────────────
@@ -32,17 +34,3 @@ export type {
   ContainerFSNode,
   AeonContainerEnv,
 } from './services/types';
-
-// ── Components ──────────────────────────────────────────────────────
-export { AeonContainerIDE } from './components/AeonContainerIDE';
-export { AeonIdeEditorPane } from './components/AeonIdeEditorPane';
-export { AeonIdePanels } from './components/AeonIdePanels';
-export { CapabilityBadge } from './components/CapabilityBadge';
-export { ExecutionConsole } from './components/ExecutionConsole';
-export type { ExecutionLogEntry } from './components/ExecutionConsole';
-export { ExecutionToolbar } from './components/ExecutionToolbar';
-export { FileTree } from './components/FileTree';
-
-// ── Hooks ───────────────────────────────────────────────────────────
-export { useAeonContainer } from './hooks/useAeonContainer';
-export { useAgentRoomCollaboration } from './hooks/useAgentRoomCollaboration';
