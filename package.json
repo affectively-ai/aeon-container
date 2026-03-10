@@ -1,8 +1,8 @@
 {
   "name": "@affectively/aeon-container",
-  "version": "0.1.0",
+  "version": "5.0.0",
   "type": "module",
-  "description": "Aeon Container — browser sandbox, persistent filesystem, linting, and agent collaboration runtime",
+  "description": "Aeon Container \u2014 browser sandbox, persistent filesystem, linting, and agent collaboration runtime",
   "exports": {
     ".": "./src/index.ts",
     "./services/*": "./src/services/*.ts"
@@ -10,9 +10,13 @@
   "scripts": {
     "test": "bun ../../scripts/bun-isolated-runner.ts . --preload ../../bun.preload.ts"
   },
+  "dependencies": {
+    "quickjs-emscripten": "^0.32.0",
+    "@swc/wasm-web": "^1.12.0"
+  },
   "devDependencies": {
     "typescript": "^5.9.3"
   },
-  "author": "Edgework DAO",
+  "author": "Taylor William Buley (https://buley.fyi)",
   "license": "MIT"
 }
