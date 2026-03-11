@@ -11,6 +11,7 @@
     "test": "bun ../../scripts/bun-isolated-runner.ts . --preload ../../bun.preload.ts"
   },
   "dependencies": {
+    "@affectively/aeon-logic": "workspace:*",
     "quickjs-emscripten": "^0.32.0",
     "@swc/wasm-web": "^1.12.0"
   },

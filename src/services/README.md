@@ -8,9 +8,9 @@ Browser and edge adapter services for Aeon IDE execution, persistence, lint stre
 
 - `agent-room-client.ts` - room snapshot/presence/todo client for embedded IDE collaboration
 - `api-routes.ts` - container API base URL/path resolution helpers
-- `browser-sandbox.ts` - browser QuickJS execution runtime with edge fallback
+- `browser-sandbox.ts` - browser QuickJS execution runtime with edge fallback plus `aeon-logic` TLA sandbox runner integration
 - `dev-writeback.ts` - developer writeback integration utilities
-- `persistent-fs.ts` - local-first filesystem cache with Dash relay and D1 sync
+- `persistent-fs.ts` - local-first filesystem cache with Dash relay and D1 sync (includes `.tla` language detection)
 - `streamed-lint-client.ts` - streamed lint worker client
 - `streamed-lint-core.ts` - lint diagnostics core pipeline
 - `streamed-lint-types.ts` - shared lint types

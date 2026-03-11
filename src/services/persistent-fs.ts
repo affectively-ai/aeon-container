@@ -690,6 +690,7 @@ export class PersistentFS {
       tsx: 'typescript',
       js: 'javascript',
       jsx: 'javascript',
+      tla: 'tla',
       go: 'go',
       py: 'python',
       rs: 'rust',

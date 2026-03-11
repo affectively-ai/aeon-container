@@ -185,5 +185,12 @@ describe('PersistentFS', () => {
       const rsFile = files.find((f) => f.path === '/main.rs');
       expect(rsFile?.language).toBe('rust');
     });
+
+    it('should detect TLA files', () => {
+      fs.seedFiles([{ path: '/spec/triangle.tla', content: 'Spec == TRUE' }]);
+      const files = fs.listFiles();
+      const tlaFile = files.find((f) => f.path === '/spec/triangle.tla');
+      expect(tlaFile?.language).toBe('tla');
+    });
   });
 });

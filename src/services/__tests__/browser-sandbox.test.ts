@@ -8,6 +8,25 @@
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { BrowserSandbox } from '../browser-sandbox';
 
+const SAMPLE_TLA_MODULE = `------------------------------ MODULE TriangleOrder ------------------------------
+EXTENDS Naturals, Sequences
+
+VARIABLES entered, exited
+
+Init == /\\ entered = <<1, 2, 3, 4, 5>>
+        /\\ exited = <<1, 2, 3, 4, 5>>
+
+OrderPreserved == entered = exited
+Spec == Init /\\ []OrderPreserved
+
+=============================================================================
+`;
+
+const SAMPLE_TLC_CONFIG = `SPECIFICATION Spec
+INVARIANTS
+  OrderPreserved
+`;
+
 describe('BrowserSandbox', () => {
   let sandbox: BrowserSandbox;
 
@@ -116,6 +135,42 @@ describe('BrowserSandbox', () => {
         });
         expect(result.outcome).toBe('OUTCOME_UNSUPPORTED_LANGUAGE');
       }
+    });
+  });
+
+  describe('execute — TLA sandbox', () => {
+    it('runs aeon-logic parser checks for a TLA module', async () => {
+      const result = await sandbox.execute({
+        code: SAMPLE_TLA_MODULE,
+        language: 'tla',
+      });
+
+      expect(result.outcome).toBe('OUTCOME_OK');
+      expect(result.language).toBe('tla');
+      expect(result.output).toContain('"mode": "tla-sandbox"');
+      expect(result.output).toContain('"name": "TriangleOrder"');
+      expect(result.logs).toContain('Parsing TLA module...');
+    });
+
+    it('parses TLA module and trailing TLC config in one request', async () => {
+      const result = await sandbox.execute({
+        code: `${SAMPLE_TLA_MODULE}\n${SAMPLE_TLC_CONFIG}`,
+        language: 'tla',
+      });
+
+      expect(result.outcome).toBe('OUTCOME_OK');
+      expect(result.output).toContain('"config"');
+      expect(result.logs).toContain('Parsing TLC config...');
+    });
+
+    it('returns OUTCOME_ERROR for invalid TLA content', async () => {
+      const result = await sandbox.execute({
+        code: 'MODULE missing_header_footer',
+        language: 'tla',
+      });
+
+      expect(result.outcome).toBe('OUTCOME_ERROR');
+      expect(result.error).toBeDefined();
     });
   });
 

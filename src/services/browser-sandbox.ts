@@ -13,12 +13,18 @@
 import type {
   ContainerExecuteRequest,
   ContainerExecuteResult,
-  ContainerLanguage,
   ExecutionOutcome,
   AeonFSNode,
 } from './types';
 import { DEFAULT_TIMEOUT_MS, MAX_LOG_LINES, MAX_OUTPUT_SIZE } from './types';
 import { joinContainerApiPath } from './api-routes';
+
+interface AeonLogicSandboxModule {
+  readonly runTlaSandbox: (sourceText: string) => {
+    readonly report: unknown;
+    readonly logs: readonly string[];
+  };
+}
 
 // ============================================
 // BROWSER SANDBOX
@@ -87,6 +93,12 @@ export class BrowserSandbox {
   async execute(
     request: ContainerExecuteRequest
   ): Promise<ContainerExecuteResult> {
+    const language = request.language || 'javascript';
+
+    if (language === 'tla') {
+      return this.executeTlaInBrowser(request);
+    }
+
     const ready = await this.ensureLoaded();
 
     if (!ready) {
@@ -100,11 +112,66 @@ export class BrowserSandbox {
         error: 'QuickJS WASM not available and no edge fallback configured',
         logs: [],
         execution_time_ms: 0,
-        language: request.language || 'javascript',
+        language,
       };
     }
 
     return this.executeInBrowser(request);
+  }
+
+  private async executeTlaInBrowser(
+    request: ContainerExecuteRequest
+  ): Promise<ContainerExecuteResult> {
+    const startTime = performance.now();
+    const timeoutMs = request.timeout_ms || DEFAULT_TIMEOUT_MS;
+
+    try {
+      const { runTlaSandbox } = await this.loadAeonLogic();
+      const sandboxResult = runTlaSandbox(request.code);
+
+      const elapsed = performance.now() - startTime;
+      if (elapsed > timeoutMs) {
+        return {
+          outcome: 'OUTCOME_TIMEOUT',
+          output: '',
+          error: `Execution timed out after ${timeoutMs}ms`,
+          logs: [],
+          execution_time_ms: elapsed,
+          language: 'tla',
+        };
+      }
+
+      return {
+        outcome: 'OUTCOME_OK',
+        output: JSON.stringify(sandboxResult.report, null, 2).slice(0, MAX_OUTPUT_SIZE),
+        logs: Array.from(sandboxResult.logs).slice(0, MAX_LOG_LINES),
+        execution_time_ms: elapsed,
+        language: 'tla',
+      };
+    } catch (err) {
+      const elapsed = performance.now() - startTime;
+      const error = err instanceof Error ? err.message : String(err);
+
+      if (elapsed > timeoutMs) {
+        return {
+          outcome: 'OUTCOME_TIMEOUT',
+          output: '',
+          error: `Execution timed out after ${timeoutMs}ms`,
+          logs: [],
+          execution_time_ms: elapsed,
+          language: 'tla',
+        };
+      }
+
+      return {
+        outcome: 'OUTCOME_ERROR',
+        output: '',
+        error,
+        logs: [],
+        execution_time_ms: elapsed,
+        language: 'tla',
+      };
+    }
   }
 
   // ── Browser Execution ──────────────────────────────────────────
@@ -118,12 +185,13 @@ export class BrowserSandbox {
     const logs: string[] = [];
     let output = '';
 
-    // Only JavaScript/TypeScript can run directly in QuickJS
+    // Only JavaScript/TypeScript can run directly in QuickJS.
+    // TLA is handled by executeTlaInBrowser before this branch.
     if (language !== 'javascript' && language !== 'typescript') {
       return {
         outcome: 'OUTCOME_UNSUPPORTED_LANGUAGE',
         output: '',
-        error: `Browser sandbox only supports JavaScript/TypeScript. Use edge API for ${language}.`,
+        error: `Browser sandbox supports JavaScript/TypeScript via QuickJS and TLA via aeon-logic. Use edge API for ${language}.`,
         logs: [],
         execution_time_ms: performance.now() - startTime,
         language,
@@ -345,6 +413,16 @@ export class BrowserSandbox {
         // Remove 'as' type assertions
         .replace(/\s+as\s+\w+/g, '')
     );
+  }
+
+  private async loadAeonLogic(): Promise<AeonLogicSandboxModule> {
+    try {
+      const packageSpecifier = '@affectively/aeon-logic';
+      return (await import(packageSpecifier)) as AeonLogicSandboxModule;
+    } catch {
+      // Workspace fallback when package exports are not linked in local test runs.
+      return (await import('../../../aeon-logic/dist/index.js')) as AeonLogicSandboxModule;
+    }
   }
 
   // ── Edge Fallback ──────────────────────────────────────────────

@@ -12,6 +12,7 @@
 export type ContainerLanguage =
   | 'javascript'
   | 'typescript'
+  | 'tla'
   | 'go'
   | 'python'
   | 'lua'
