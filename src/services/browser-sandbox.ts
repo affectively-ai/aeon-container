@@ -26,6 +26,16 @@ interface AeonLogicSandboxModule {
   };
 }
 
+function isAeonLogicSandboxModule(
+  value: unknown
+): value is AeonLogicSandboxModule {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    typeof (value as { runTlaSandbox?: unknown }).runTlaSandbox === 'function'
+  );
+}
+
 // ============================================
 // BROWSER SANDBOX
 // ============================================
@@ -418,11 +428,32 @@ export class BrowserSandbox {
   private async loadAeonLogic(): Promise<AeonLogicSandboxModule> {
     try {
       const packageSpecifier = '@affectively/aeon-logic';
-      return (await import(packageSpecifier)) as AeonLogicSandboxModule;
+      const fromPackage = await import(packageSpecifier);
+      if (isAeonLogicSandboxModule(fromPackage)) {
+        return fromPackage;
+      }
     } catch {
-      // Workspace fallback when package exports are not linked in local test runs.
-      return (await import('../../../aeon-logic/dist/index.js')) as AeonLogicSandboxModule;
+      // Continue to workspace fallbacks.
     }
+
+    try {
+      // Workspace source fallback for local tests where package exports are unavailable.
+      const fromWorkspaceSource = await import('../../../aeon-logic/src/index.ts');
+      if (isAeonLogicSandboxModule(fromWorkspaceSource)) {
+        return fromWorkspaceSource;
+      }
+    } catch {
+      // Continue to dist fallback.
+    }
+
+    const fromWorkspaceDist = await import('../../../aeon-logic/dist/index.js');
+    if (isAeonLogicSandboxModule(fromWorkspaceDist)) {
+      return fromWorkspaceDist;
+    }
+
+    throw new Error(
+      'aeon-logic runTlaSandbox export was not found in package, source, or dist fallback.',
+    );
   }
 
   // ── Edge Fallback ──────────────────────────────────────────────
