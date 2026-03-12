@@ -438,7 +438,7 @@ export class BrowserSandbox {
 
     try {
       // Workspace source fallback for local tests where package exports are unavailable.
-      const fromWorkspaceSource = await import('../../../aeon-logic/src/index.ts');
+      const fromWorkspaceSource = await import('../../../aeon-logic/src/index');
       if (isAeonLogicSandboxModule(fromWorkspaceSource)) {
         return fromWorkspaceSource;
       }
