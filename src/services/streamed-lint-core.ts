@@ -63,6 +63,8 @@ export function lintDocumentCore(input: LintCoreInput): LintCoreOutput {
     lintGoRules(diagnostics, lines);
   } else if (language === 'python') {
     lintPythonRules(diagnostics, lines);
+  } else if (language === 'gnosis') {
+    lintGnosisRules(diagnostics, lines);
   } else {
     lintGenericRules(diagnostics, lines);
   }
@@ -325,6 +327,45 @@ function lintPythonRules(
         source: 'python-rules',
         code: 'PY_PRINT_DEBUG',
         message: 'print() call detected; confirm this is intentional.',
+      });
+    }
+  });
+}
+
+function lintGnosisRules(
+  diagnostics: MutableDiagnostic[],
+  lines: string[]
+): void {
+  lines.forEach((lineContent, lineIndex) => {
+    const lineNumber = lineIndex + 1;
+
+    const imperativeKeywords = ['function', 'return', 'if', 'while', 'var', 'let', 'const'];
+    imperativeKeywords.forEach(keyword => {
+      const index = lineContent.indexOf(keyword);
+      if (index >= 0) {
+        diagnostics.push({
+          line: lineNumber,
+          column: index + 1,
+          endLine: lineNumber,
+          endColumn: index + keyword.length + 1,
+          severity: 'error',
+          source: 'gnosis-rules',
+          code: 'GNOSIS_IMPERATIVE_REJECTED',
+          message: `Imperative keyword '${keyword}' rejected. Use topological graph syntax.`,
+        });
+      }
+    });
+
+    if (lineContent.includes(')-[:') && !lineContent.includes(']->(')) {
+      diagnostics.push({
+        line: lineNumber,
+        column: 1,
+        endLine: lineNumber,
+        endColumn: lineContent.length + 1,
+        severity: 'warning',
+        source: 'gnosis-rules',
+        code: 'GNOSIS_INCOMPLETE_EDGE',
+        message: 'Incomplete edge declaration detected.',
       });
     }
   });
