@@ -15,6 +15,7 @@ import type {
   ContainerExecuteResult,
   ExecutionOutcome,
   AeonFSNode,
+  FileEntry,
 } from './types';
 import { DEFAULT_TIMEOUT_MS, MAX_LOG_LINES, MAX_OUTPUT_SIZE } from './types';
 import { joinContainerApiPath } from './api-routes';
@@ -153,7 +154,10 @@ export class BrowserSandbox {
 
       return {
         outcome: 'OUTCOME_OK',
-        output: JSON.stringify(sandboxResult.report, null, 2).slice(0, MAX_OUTPUT_SIZE),
+        output: JSON.stringify(sandboxResult.report, null, 2).slice(
+          0,
+          MAX_OUTPUT_SIZE
+        ),
         logs: Array.from(sandboxResult.logs).slice(0, MAX_LOG_LINES),
         execution_time_ms: elapsed,
         language: 'tla',
@@ -341,9 +345,15 @@ export class BrowserSandbox {
 
   // ── Filesystem Injection ───────────────────────────────────────
 
-  private injectFilesystem(vm: any, filesystem: AeonFSNode): void {
+  private injectFilesystem(
+    vm: any,
+    filesystem: AeonFSNode | { files?: FileEntry[] }
+  ): void {
     // Flatten the tree into a simple path→content map for the sandbox
-    const files = this.flattenFS(filesystem);
+    const files =
+      'type' in filesystem
+        ? this.flattenFS(filesystem)
+        : this.flattenFileEntries(filesystem.files ?? []);
     const fsJson = JSON.stringify(files);
 
     const fsResult = vm.evalCode(`
@@ -392,6 +402,23 @@ export class BrowserSandbox {
     if (node.children) {
       for (const child of node.children) {
         Object.assign(files, this.flattenFS(child));
+      }
+    }
+    return files;
+  }
+
+  private flattenFileEntries(entries: FileEntry[]): Record<string, string> {
+    const files: Record<string, string> = {};
+    for (const entry of entries) {
+      if (entry.type === 'directory' || entry.isDirectory) {
+        continue;
+      }
+      const entryPath =
+        typeof entry.path === 'string'
+          ? entry.path
+          : `/${entry.name ?? 'file'}`;
+      if (typeof entry.content === 'string') {
+        files[entryPath] = entry.content;
       }
     }
     return files;
@@ -452,7 +479,7 @@ export class BrowserSandbox {
     }
 
     throw new Error(
-      'aeon-logic runTlaSandbox export was not found in package, source, or dist fallback.',
+      'aeon-logic runTlaSandbox export was not found in package, source, or dist fallback.'
     );
   }
 

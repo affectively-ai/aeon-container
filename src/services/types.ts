@@ -12,6 +12,7 @@
 export type ContainerLanguage =
   | 'javascript'
   | 'typescript'
+  | 'go'
   | 'lua'
   | 'tla'
   | 'gnosis'
@@ -21,9 +22,17 @@ export type ContainerLanguage =
 export interface ContainerExecuteRequest {
   code: string;
   language: ContainerLanguage;
+  session_id?: string;
   timeout_ms?: number;
   memory_limit_bytes?: number;
   mounts?: ContainerMount[];
+  context?: {
+    cwd?: string;
+    env?: Record<string, string>;
+    argv?: string[];
+  };
+  filesystem?: AeonFSNode | { files?: FileEntry[] };
+  ucan?: unknown;
 }
 
 export type ExecutionOutcome =
@@ -41,6 +50,9 @@ export interface ContainerExecuteResult {
   execution_time_ms: number;
   filesystem_changes?: AeonFSChange[];
   language: ContainerLanguage;
+  ast?: unknown;
+  b1?: number;
+  execution_proof?: unknown;
 }
 
 // ============================================
@@ -96,6 +108,52 @@ export type ContainerCapability =
 export interface ContainerMount {
   path: string;
   target: string;
+}
+
+export interface FileEntry {
+  name?: string;
+  path: string;
+  content?: string;
+  size?: number;
+  type?: 'file' | 'directory' | 'module';
+  language?: string;
+  dirty?: boolean;
+  isDirectory?: boolean;
+  metadata?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+export interface ContainerLockState {
+  locked?: boolean;
+  container_id?: string;
+  owner_did?: string;
+  ownerId?: string;
+  expiresAt?: number;
+  lease_id?: string;
+  heartbeat_at?: string | number;
+  [key: string]: unknown;
+}
+
+export interface ExecutionReceipt {
+  id: string;
+  status: 'ok' | 'error' | 'timeout';
+  output?: string;
+  error?: string;
+  timestamp?: number;
+  event_type?: string;
+  created_at?: string | number;
+  actor_did?: string;
+  [key: string]: unknown;
+}
+
+export interface RepoIngestInput {
+  container_id?: string;
+  repoUrl: string;
+  branch?: string;
+  commit?: string;
+  mountPath?: string;
+  source_type?: string;
+  [key: string]: unknown;
 }
 
 // ============================================
