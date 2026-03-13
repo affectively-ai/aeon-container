@@ -490,7 +490,7 @@ export class BrowserSandbox {
 
   private async loadAeonLogic(): Promise<AeonLogicSandboxModule> {
     try {
-      const packageSpecifier = '@affectively/aeon-logic';
+      const packageSpecifier = '@affectively/aeon-logic/browser';
       const fromPackage = await import(packageSpecifier);
       if (isAeonLogicSandboxModule(fromPackage)) {
         return fromPackage;
@@ -501,21 +501,18 @@ export class BrowserSandbox {
 
     try {
       // Workspace source fallback for local tests where package exports are unavailable.
-      const fromWorkspaceSource = await import('../../../aeon-logic/src/index');
+      const fromWorkspaceSource = await import(
+        '../../../aeon-logic/src/browser'
+      );
       if (isAeonLogicSandboxModule(fromWorkspaceSource)) {
         return fromWorkspaceSource;
       }
     } catch {
-      // Continue to dist fallback.
-    }
-
-    const fromWorkspaceDist = await import('../../../aeon-logic/dist/index.js');
-    if (isAeonLogicSandboxModule(fromWorkspaceDist)) {
-      return fromWorkspaceDist;
+      // Fall through to error.
     }
 
     throw new Error(
-      'aeon-logic runTlaSandbox export was not found in package, source, or dist fallback.'
+      'aeon-logic browser entry runTlaSandbox export was not found in package or source fallback.'
     );
   }
 
@@ -591,9 +588,7 @@ export class BrowserSandbox {
       // Fall through to error.
     }
 
-    throw new Error(
-      'BettyCompiler export was not found in package import.'
-    );
+    throw new Error('BettyCompiler export was not found in package import.');
   }
 
   private shouldFallbackToBrowserGnosis(
