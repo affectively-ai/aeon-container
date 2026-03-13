@@ -5,7 +5,7 @@
  * Covers: JS execution, console capture, timeout handling, FS injection, edge fallback.
  */
 
-import { describe, it, expect, beforeEach } from 'bun:test';
+import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import { BrowserSandbox } from '../browser-sandbox';
 
 const SAMPLE_TLA_MODULE = `------------------------------ MODULE TriangleOrder ------------------------------
@@ -29,10 +29,16 @@ INVARIANTS
 
 describe('BrowserSandbox', () => {
   let sandbox: BrowserSandbox;
+  const originalFetch = globalThis.fetch;
 
   beforeEach(() => {
     // Get a fresh singleton reference
     sandbox = BrowserSandbox.getInstance();
+  });
+
+  afterEach(() => {
+    sandbox.setEdgeFallbackUrl('');
+    globalThis.fetch = originalFetch;
   });
 
   describe('getInstance', () => {
@@ -136,6 +142,20 @@ describe('BrowserSandbox', () => {
         expect(result.outcome).toBe('OUTCOME_UNSUPPORTED_LANGUAGE');
       }
     });
+
+    it('returns a guidance error when gnosis syntax is run as JavaScript', async () => {
+      await sandbox.ensureLoaded();
+      if (sandbox.isReady()) {
+        const result = await sandbox.execute({
+          code: '(start)-[:PROCESS]->(finish)',
+          language: 'javascript',
+        });
+        expect(result.outcome).toBe('OUTCOME_UNSUPPORTED_LANGUAGE');
+        expect(result.error).toContain(
+          'Switch language to Gnosis (.gg)'
+        );
+      }
+    });
   });
 
   describe('execute — TLA sandbox', () => {
@@ -171,6 +191,193 @@ describe('BrowserSandbox', () => {
 
       expect(result.outcome).toBe('OUTCOME_ERROR');
       expect(result.error).toBeDefined();
+    });
+  });
+
+  describe('execute — Gnosis routing', () => {
+    it('uses edge API for gnosis when fallback URL is configured', async () => {
+      let capturedUrl = '';
+
+      sandbox.setEdgeFallbackUrl('https://api.example.com/v1/aeon-container');
+      globalThis.fetch = (async (input: RequestInfo | URL) => {
+        capturedUrl =
+          typeof input === 'string'
+            ? input
+            : input instanceof URL
+            ? input.toString()
+            : input.url;
+
+        return new Response(
+          JSON.stringify({
+            outcome: 'OUTCOME_OK',
+            output: 'edge-gnosis-result',
+            logs: [],
+            execution_time_ms: 1,
+            language: 'gnosis',
+          }),
+          {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          }
+        );
+      }) as typeof fetch;
+
+      const result = await sandbox.execute({
+        code: '(start)-[:PROCESS]->(finish)',
+        language: 'gnosis',
+      });
+
+      expect(capturedUrl).toBe(
+        'https://api.example.com/v1/aeon-container/execute'
+      );
+      expect(result.outcome).toBe('OUTCOME_OK');
+      expect(result.output).toContain('edge-gnosis-result');
+      expect(result.language).toBe('gnosis');
+    });
+
+    it('falls back to browser gnosis when edge returns INVALID_LANGUAGE', async () => {
+      sandbox.setEdgeFallbackUrl('https://api.example.com/v1/aeon-container');
+
+      globalThis.fetch = (async () => {
+        return new Response(
+          JSON.stringify({
+            error:
+              'Unsupported language: gnosis. Supported: javascript, typescript, go, python, rust, lua',
+            code: 'INVALID_LANGUAGE',
+          }),
+          {
+            status: 400,
+            headers: { 'Content-Type': 'application/json' },
+          }
+        );
+      }) as typeof fetch;
+
+      const originalBrowserGnosis = (
+        sandbox as unknown as {
+          executeGnosisInBrowser: (request: unknown) => Promise<{
+            outcome: string;
+            output: string;
+            logs: string[];
+            execution_time_ms: number;
+            language: string;
+          }>;
+        }
+      ).executeGnosisInBrowser;
+
+      (
+        sandbox as unknown as {
+          executeGnosisInBrowser: (request: unknown) => Promise<{
+            outcome: string;
+            output: string;
+            logs: string[];
+            execution_time_ms: number;
+            language: string;
+          }>;
+        }
+      ).executeGnosisInBrowser = async () => ({
+        outcome: 'OUTCOME_OK',
+        output: 'browser-gnosis-fallback-result',
+        logs: [],
+        execution_time_ms: 1,
+        language: 'gnosis',
+      });
+
+      try {
+        const result = await sandbox.execute({
+          code: '(start)-[:PROCESS]->(finish)',
+          language: 'gnosis',
+        });
+
+        expect(result.outcome).toBe('OUTCOME_OK');
+        expect(result.output).toContain('browser-gnosis-fallback-result');
+        expect(result.language).toBe('gnosis');
+      } finally {
+        (
+          sandbox as unknown as {
+            executeGnosisInBrowser: (request: unknown) => Promise<{
+              outcome: string;
+              output: string;
+              logs: string[];
+              execution_time_ms: number;
+              language: string;
+            }>;
+          }
+        ).executeGnosisInBrowser = originalBrowserGnosis;
+      }
+    });
+
+    it('falls back to browser gnosis when edge disallows string code generation', async () => {
+      sandbox.setEdgeFallbackUrl('https://api.example.com/v1/aeon-container');
+
+      globalThis.fetch = (async () => {
+        return new Response(
+          JSON.stringify({
+            outcome: 'OUTCOME_ERROR',
+            output: '',
+            error: 'Code generation from strings disallowed for this context',
+            logs: [],
+            execution_time_ms: 1,
+            language: 'gnosis',
+          }),
+          {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          }
+        );
+      }) as typeof fetch;
+
+      const originalBrowserGnosis = (
+        sandbox as unknown as {
+          executeGnosisInBrowser: (request: unknown) => Promise<{
+            outcome: string;
+            output: string;
+            logs: string[];
+            execution_time_ms: number;
+            language: string;
+          }>;
+        }
+      ).executeGnosisInBrowser;
+
+      (
+        sandbox as unknown as {
+          executeGnosisInBrowser: (request: unknown) => Promise<{
+            outcome: string;
+            output: string;
+            logs: string[];
+            execution_time_ms: number;
+            language: string;
+          }>;
+        }
+      ).executeGnosisInBrowser = async () => ({
+        outcome: 'OUTCOME_OK',
+        output: 'browser-gnosis-runtime-safe-fallback',
+        logs: [],
+        execution_time_ms: 1,
+        language: 'gnosis',
+      });
+
+      try {
+        const result = await sandbox.execute({
+          code: '(start)-[:PROCESS]->(finish)',
+          language: 'gnosis',
+        });
+
+        expect(result.outcome).toBe('OUTCOME_OK');
+        expect(result.output).toContain('browser-gnosis-runtime-safe-fallback');
+        expect(result.language).toBe('gnosis');
+      } finally {
+        (
+          sandbox as unknown as {
+            executeGnosisInBrowser: (request: unknown) => Promise<{
+              outcome: string;
+              output: string;
+              logs: string[];
+              execution_time_ms: number;
+              language: string;
+            }>;
+          }
+        ).executeGnosisInBrowser = originalBrowserGnosis;
+      }
     });
   });
 

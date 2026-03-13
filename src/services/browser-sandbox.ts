@@ -110,6 +110,18 @@ export class BrowserSandbox {
       return this.executeTlaInBrowser(request);
     }
 
+    if (language === 'gnosis') {
+      // Prefer edge runtime when available, but fall back to browser compiler
+      // when edge rejects gnosis as an unsupported language.
+      if (this.edgeFallbackUrl) {
+        const edgeResult = await this.executeViaEdge(request);
+        if (!this.shouldFallbackToBrowserGnosis(edgeResult)) {
+          return edgeResult;
+        }
+      }
+      return this.executeGnosisInBrowser(request);
+    }
+
     const ready = await this.ensureLoaded();
 
     if (!ready) {
@@ -206,6 +218,18 @@ export class BrowserSandbox {
         outcome: 'OUTCOME_UNSUPPORTED_LANGUAGE',
         output: '',
         error: `Browser sandbox supports JavaScript/TypeScript via QuickJS and TLA via aeon-logic. Use edge API for ${language}.`,
+        logs: [],
+        execution_time_ms: performance.now() - startTime,
+        language,
+      };
+    }
+
+    if (this.looksLikeGnosisTopology(request.code)) {
+      return {
+        outcome: 'OUTCOME_UNSUPPORTED_LANGUAGE',
+        output: '',
+        error:
+          'Detected Gnosis topology syntax while JavaScript/TypeScript mode is selected. Switch language to Gnosis (.gg).',
         logs: [],
         execution_time_ms: performance.now() - startTime,
         language,
@@ -452,6 +476,18 @@ export class BrowserSandbox {
     );
   }
 
+  private looksLikeGnosisTopology(code: string): boolean {
+    const source = code.trim();
+    if (!source) {
+      return false;
+    }
+
+    return (
+      /\([^)]+\)\s*-\s*\[:[A-Z_]+\]\s*->\s*\([^)]+\)/m.test(source) ||
+      /^\s*HALT\b/m.test(source)
+    );
+  }
+
   private async loadAeonLogic(): Promise<AeonLogicSandboxModule> {
     try {
       const packageSpecifier = '@affectively/aeon-logic';
@@ -480,6 +516,98 @@ export class BrowserSandbox {
 
     throw new Error(
       'aeon-logic runTlaSandbox export was not found in package, source, or dist fallback.'
+    );
+  }
+
+  private async executeGnosisInBrowser(
+    request: ContainerExecuteRequest
+  ): Promise<ContainerExecuteResult> {
+    const startTime = performance.now();
+    const timeoutMs = request.timeout_ms || DEFAULT_TIMEOUT_MS;
+
+    try {
+      const { BettyCompiler } = await this.loadGnosis();
+      const compiler = new BettyCompiler();
+      const parseResult = compiler.parse(request.code);
+
+      const elapsed = performance.now() - startTime;
+      if (elapsed > timeoutMs) {
+        return {
+          outcome: 'OUTCOME_TIMEOUT',
+          output: '',
+          error: `Execution timed out after ${timeoutMs}ms`,
+          logs: [],
+          execution_time_ms: elapsed,
+          language: 'gnosis',
+        };
+      }
+
+      return {
+        outcome: 'OUTCOME_OK',
+        output: parseResult.output.slice(0, MAX_OUTPUT_SIZE),
+        logs: compiler.getLogs().slice(0, MAX_LOG_LINES),
+        execution_time_ms: elapsed,
+        language: 'gnosis',
+        ast: parseResult.ast,
+        b1: parseResult.b1,
+        error:
+          parseResult.diagnostics?.length > 0
+            ? `Compiler reported ${parseResult.diagnostics.length} issue(s)`
+            : undefined,
+      };
+    } catch (err) {
+      const elapsed = performance.now() - startTime;
+      const error = err instanceof Error ? err.message : String(err);
+
+      if (elapsed > timeoutMs) {
+        return {
+          outcome: 'OUTCOME_TIMEOUT',
+          output: '',
+          error: `Execution timed out after ${timeoutMs}ms`,
+          logs: [],
+          execution_time_ms: elapsed,
+          language: 'gnosis',
+        };
+      }
+
+      return {
+        outcome: 'OUTCOME_ERROR',
+        output: '',
+        error,
+        logs: [],
+        execution_time_ms: elapsed,
+        language: 'gnosis',
+      };
+    }
+  }
+
+  private async loadGnosis(): Promise<any> {
+    try {
+      const fromPackage = await import('@affectively/gnosis-compiler');
+      if (fromPackage && fromPackage.BettyCompiler) {
+        return fromPackage;
+      }
+    } catch {
+      // Fall through to error.
+    }
+
+    throw new Error(
+      'BettyCompiler export was not found in package import.'
+    );
+  }
+
+  private shouldFallbackToBrowserGnosis(
+    edgeResult: ContainerExecuteResult
+  ): boolean {
+    if (edgeResult.outcome !== 'OUTCOME_ERROR') {
+      return false;
+    }
+
+    const message = (edgeResult.error || '').toLowerCase();
+    return (
+      message.includes('unsupported language') ||
+      message.includes('invalid_language') ||
+      message.includes('code generation from strings disallowed')
     );
   }
 

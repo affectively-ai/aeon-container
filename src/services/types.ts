@@ -52,6 +52,7 @@ export interface ContainerExecuteResult {
   language: ContainerLanguage;
   ast?: unknown;
   b1?: number;
+  buleyMeasure?: number;
   execution_proof?: unknown;
 }
 
