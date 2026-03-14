@@ -195,6 +195,22 @@ describe('BrowserSandbox', () => {
   });
 
   describe('execute — Gnosis routing', () => {
+    it('builds a degraded workbench bundle in browser mode', async () => {
+      const result = await sandbox.execute({
+        code: '(start {viz_label: source})-[:PROCESS]->(finish {viz_color: cyan})',
+        language: 'gnosis',
+      });
+
+      expect(result.outcome).toBe('OUTCOME_OK');
+      expect(result.language).toBe('gnosis');
+      expect(result.gnosis?.capabilities.supportsFormal).toBe(false);
+      expect(result.gnosis?.scene.nodes.length).toBeGreaterThan(0);
+      expect(result.gnosis?.capabilities.degradedReason).toContain(
+        'Browser fallback'
+      );
+      expect(result.b1).toBe(result.gnosis?.compiler.b1);
+    });
+
     it('uses edge API for gnosis when fallback URL is configured', async () => {
       let capturedUrl = '';
 

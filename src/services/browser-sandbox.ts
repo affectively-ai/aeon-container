@@ -19,12 +19,23 @@ import type {
 } from './types';
 import { DEFAULT_TIMEOUT_MS, MAX_LOG_LINES, MAX_OUTPUT_SIZE } from './types';
 import { joinContainerApiPath } from './api-routes';
+import type { GnosisWorkbenchBundle } from '@affectively/gnosis-viz';
 
 interface AeonLogicSandboxModule {
   readonly runTlaSandbox: (sourceText: string) => {
     readonly report: unknown;
     readonly logs: readonly string[];
   };
+}
+
+interface BrowserGnosisWorkbenchModule {
+  readonly buildBrowserGnosisWorkbenchBundle: (
+    source: string,
+    options?: {
+      readonly sourceFilePath?: string;
+      readonly degradedReason?: string;
+    }
+  ) => Promise<GnosisWorkbenchBundle>;
 }
 
 function isAeonLogicSandboxModule(
@@ -523,9 +534,12 @@ export class BrowserSandbox {
     const timeoutMs = request.timeout_ms || DEFAULT_TIMEOUT_MS;
 
     try {
-      const { BettyCompiler } = await this.loadGnosis();
-      const compiler = new BettyCompiler();
-      const parseResult = compiler.parse(request.code);
+      const { buildBrowserGnosisWorkbenchBundle } =
+        await this.loadGnosisWorkbench();
+      const bundle = await buildBrowserGnosisWorkbenchBundle(request.code);
+      const diagnosticLogs = bundle.compiler.diagnostics.map((diagnostic) => {
+        return `${diagnostic.severity.toUpperCase()} ${diagnostic.line}:${diagnostic.column} ${diagnostic.message}`;
+      });
 
       const elapsed = performance.now() - startTime;
       if (elapsed > timeoutMs) {
@@ -541,16 +555,18 @@ export class BrowserSandbox {
 
       return {
         outcome: 'OUTCOME_OK',
-        output: parseResult.output.slice(0, MAX_OUTPUT_SIZE),
-        logs: compiler.getLogs().slice(0, MAX_LOG_LINES),
+        output: bundle.compiler.output.slice(0, MAX_OUTPUT_SIZE),
+        logs: diagnosticLogs.slice(0, MAX_LOG_LINES),
         execution_time_ms: elapsed,
         language: 'gnosis',
-        ast: parseResult.ast,
-        b1: parseResult.b1,
+        ast: bundle.compiler.ast,
+        b1: bundle.compiler.b1,
+        buleyMeasure: bundle.compiler.buleyMeasure,
+        gnosis: bundle,
         error:
-          parseResult.diagnostics?.length > 0
-            ? `Compiler reported ${parseResult.diagnostics.length} issue(s)`
-            : undefined,
+          bundle.compiler.diagnostics.length > 0
+            ? `Compiler reported ${bundle.compiler.diagnostics.length} issue(s)`
+            : bundle.capabilities.degradedReason,
       };
     } catch (err) {
       const elapsed = performance.now() - startTime;
@@ -578,17 +594,24 @@ export class BrowserSandbox {
     }
   }
 
-  private async loadGnosis(): Promise<any> {
+  private async loadGnosisWorkbench(): Promise<BrowserGnosisWorkbenchModule> {
     try {
-      const fromPackage = await import('@affectively/gnosis-compiler');
-      if (fromPackage && fromPackage.BettyCompiler) {
+      const fromPackage = (await import(
+        '@affectively/gnosis-viz/browser'
+      )) as Partial<BrowserGnosisWorkbenchModule>;
+      if (
+        fromPackage &&
+        typeof fromPackage.buildBrowserGnosisWorkbenchBundle === 'function'
+      ) {
         return fromPackage;
       }
     } catch {
       // Fall through to error.
     }
 
-    throw new Error('BettyCompiler export was not found in package import.');
+    throw new Error(
+      'buildBrowserGnosisWorkbenchBundle export was not found in package import.'
+    );
   }
 
   private shouldFallbackToBrowserGnosis(
@@ -654,7 +677,8 @@ export class BrowserSandbox {
         };
       }
 
-      return (await response.json()) as ContainerExecuteResult;
+      const edgeResult = (await response.json()) as ContainerExecuteResult;
+      return this.reviveEdgeGnosisResult(edgeResult);
     } catch (err) {
       return {
         outcome: 'OUTCOME_ERROR',
@@ -667,5 +691,51 @@ export class BrowserSandbox {
         language: request.language || 'javascript',
       };
     }
+  }
+
+  private reviveEdgeGnosisResult(
+    result: ContainerExecuteResult
+  ): ContainerExecuteResult {
+    const reviveAst = (value: unknown): unknown => {
+      if (
+        !value ||
+        typeof value !== 'object' ||
+        !('nodes' in value) ||
+        !('edges' in value)
+      ) {
+        return value;
+      }
+
+      const candidate = value as {
+        nodes?: unknown;
+        edges?: unknown;
+      };
+      if (!Array.isArray(candidate.nodes) || !Array.isArray(candidate.edges)) {
+        return value;
+      }
+
+      return {
+        nodes: new Map(candidate.nodes as ReadonlyArray<[string, unknown]>),
+        edges: candidate.edges,
+      };
+    };
+
+    if (result.language !== 'gnosis' && !result.gnosis) {
+      return result;
+    }
+
+    return {
+      ...result,
+      ast: reviveAst(result.ast),
+      gnosis: result.gnosis
+        ? {
+            ...result.gnosis,
+            compiler: {
+              ...result.gnosis.compiler,
+              ast: reviveAst(result.gnosis.compiler.ast) as typeof result.gnosis.compiler.ast,
+            },
+          }
+        : result.gnosis,
+    };
   }
 }

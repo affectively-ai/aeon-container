@@ -2,29 +2,26 @@
 
 Parent: [Open Source Catalog](../README.md)
 
-## Overview
-`@affectively/aeon-container` is the runtime service layer for browser-based Aeon execution surfaces. It provides:
-- browser sandbox execution with QuickJS and edge fallback
-- persistent file-system sync against container APIs
-- streamed lint orchestration (worker + fallback engine)
-- agent-room collaboration client and task/presence transport
-- dev writeback adapters for local and edge-backed file updates
+`@affectively/aeon-container` is the browser-side runtime layer for running code, keeping files in sync, streaming lint feedback, and coordinating collaborative agent sessions.
+
+The fair brag is that this package gathers several things people normally have to wire together across different libraries: sandboxed execution, persistent file handling, streamed diagnostics, writeback helpers, and room-style collaboration transport.
+
+## Why People May Like It
+
+- `BrowserSandbox` gives you a browser execution surface with an edge fallback when local execution is not enough.
+- `PersistentFS` keeps a local-first file view and can sync it back to container APIs.
+- `StreamedLintClient` is built for live diagnostics instead of batch-only lint runs.
+- `AgentRoomClient` gives you room snapshots, presence, and task transport in the same package.
+- API route helpers and writeback helpers keep the surrounding plumbing close to the runtime instead of scattering it through app code.
 
 ## Install
+
 ```bash
 bun add @affectively/aeon-container
 ```
 
-## Core Surface
-- `BrowserSandbox`
-- `PersistentFS`
-- `AgentRoomClient`
-- `DevWriteback` writeback service
-- `StreamedLintClient`
-- `createApiRoutes` and API URL helpers
-- shared execution/filesystem types from `services/types.ts`
-
 ## Quick Start
+
 ```ts
 import { BrowserSandbox } from '@affectively/aeon-container';
 
@@ -40,7 +37,10 @@ const result = await sandbox.execute({
 console.log(result.outcome, result.output);
 ```
 
-## Persistent Files Example
+## More Things You Get
+
+### Persistent Files
+
 ```ts
 import { PersistentFS } from '@affectively/aeon-container';
 
@@ -49,7 +49,8 @@ await fs.writeFile('/src/index.ts', 'export const ok = true;');
 await fs.syncToBackend();
 ```
 
-## Streamed Lint Example
+### Streamed Lint Feedback
+
 ```ts
 import { StreamedLintClient } from '@affectively/aeon-container';
 
@@ -65,11 +66,29 @@ const handle = lint.lint({
 // handle.cancel() if needed
 ```
 
+## Core Surface
+
+- `BrowserSandbox`
+- `PersistentFS`
+- `AgentRoomClient`
+- `DevWritebackManager`
+- `StreamedLintClient`
+- `createApiRoutes`
+- shared execution and filesystem types from `services/types.ts`
+
+That surface is one of the package's strongest points. It is small enough to understand, but broad enough to support a real browser container experience.
+
+## Repo Guide
+
+- [src/services/README.md](./src/services/README.md): service-by-service map
+
 ## Development
+
 ```bash
 cd open-source/aeon-container
 bun test
 ```
 
-## Subdirectories
-- `src/services/` detailed service map: [services/README.md](./src/services/README.md)
+## Why This README Is Grounded
+
+Aeon Container does not need big claims. The strongest fair brag is that it already gives you a practical browser runtime package for code execution, file sync, lint streaming, and collaborative session plumbing.

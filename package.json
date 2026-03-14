@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@affectively/aeon-logic": "workspace:*",
+    "@affectively/gnosis-viz": "workspace:*",
     "quickjs-emscripten": "^0.32.0",
     "@swc/wasm-web": "^1.12.0"
   },

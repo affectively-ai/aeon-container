@@ -5,6 +5,8 @@
  * These are pure TypeScript types with no runtime dependencies.
  */
 
+import type { GnosisWorkbenchBundle } from '@affectively/gnosis-viz';
+
 // ============================================
 // EXECUTION
 // ============================================
@@ -53,6 +55,7 @@ export interface ContainerExecuteResult {
   ast?: unknown;
   b1?: number;
   buleyMeasure?: number;
+  gnosis?: GnosisWorkbenchBundle;
   execution_proof?: unknown;
 }
 
