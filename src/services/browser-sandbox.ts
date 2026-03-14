@@ -48,6 +48,17 @@ function isAeonLogicSandboxModule(
   );
 }
 
+function isBrowserGnosisWorkbenchModule(
+  value: unknown
+): value is BrowserGnosisWorkbenchModule {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    typeof (value as { buildBrowserGnosisWorkbenchBundle?: unknown })
+      .buildBrowserGnosisWorkbenchBundle === 'function'
+  );
+}
+
 // ============================================
 // BROWSER SANDBOX
 // ============================================
@@ -596,13 +607,8 @@ export class BrowserSandbox {
 
   private async loadGnosisWorkbench(): Promise<BrowserGnosisWorkbenchModule> {
     try {
-      const fromPackage = (await import(
-        '@affectively/gnosis-viz/browser'
-      )) as Partial<BrowserGnosisWorkbenchModule>;
-      if (
-        fromPackage &&
-        typeof fromPackage.buildBrowserGnosisWorkbenchBundle === 'function'
-      ) {
+      const fromPackage: unknown = await import('@affectively/gnosis-viz/browser');
+      if (isBrowserGnosisWorkbenchModule(fromPackage)) {
         return fromPackage;
       }
     } catch {
